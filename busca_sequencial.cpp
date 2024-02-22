@@ -22,7 +22,7 @@ int main(){
     cin >> num;     //da input de qual numero você quer buscar
     int index = buscaSequencial(v, tam, num);       //chama a funcao buscaSequencial
 
-    cout << index;      // imprime o indice onde esta o numero que procurou
+    cout << index;      // imprime o indice onde esta o numero que procurado
 
     return 0;
 }
