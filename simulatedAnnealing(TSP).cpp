@@ -4,13 +4,16 @@
 #include <fstream>
 #include <sstream>
 
+//  MEXER NAS FUNCOES COMPARACAO E PROBABILIDADEDEACEITAR, ELAS ESTAO USANDO A LOGICA DE SÓ TER O SWAP MAS ADICIONEI MAIS DOIS MÉTODOS
+
+
 using namespace std;
 
-int tamanho = 17;
-float temperatura = 5000;
+int tamanho = 48;
+float temperatura = 4000;
 float alpha = 0.99;
-int repeticoes = 50000;
-int minimo = 2085;
+int repeticoes = 60000;
+int minimo = 33523;
 
 int** newMatriz(int tamanho){
     int** matriz = new int*[tamanho];
@@ -22,7 +25,7 @@ int** newMatriz(int tamanho){
 }
 
 void preencheMatriz(int tamanho, int** matriz){
-    string nomeArquivo = "database/17 cidades (2085)/distance.txt";
+    string nomeArquivo = "database/48 cidades (33523)/distance.txt";
     ifstream arquivo(nomeArquivo);
 
     string linha;
@@ -63,10 +66,68 @@ float custo(int v[], int** matrizCusto){
     return soma;
 }
 
-void swap(int v[], int posA, int posB){
+void swap(int* v, int posA, int posB){
     int aux = v[posA];
     v[posA] = v[posB];
     v[posB] = aux;
+}
+
+void inverse(int* v, int posA, int posB){
+    int aux;
+    if(posA<posB){
+        for(posA; posA<posB; posA++){
+            aux = v[posA];
+            v[posA] = v[posB];
+            v[posB] = aux;
+            posB--;
+        }
+    }
+    else{
+        for(posB; posB<posA; posB++){
+            aux = v[posA];
+            v[posA] = v[posB];
+            v[posB] = aux;
+            posA--;
+        }
+    }
+}
+
+void insert(int* v, int posA, int posB){
+    int aux;
+
+    aux = v[posA];
+
+    if(posA < posB){
+        for(int i = posA; i<posB; i++){
+            v[i] = v[i + 1];
+        }
+        v[posB] = aux;
+    }
+    else{
+        for(int i = posA; i>posB; i--){
+            v[i] = v[i - 1];
+        }
+        v[posB] = aux;
+    }
+
+
+}
+
+void changeSolution(int* v, int posA, int posB){
+    int func = rand() % 3;
+
+    switch(func){
+        case 0:
+            inverse(v, posA, posB);
+            break;
+        case 1:
+            swap(v, posA, posB);
+            break;
+        case 2:
+            insert(v, posA, posB);
+            break;
+    }
+
 }
 
 float comparacao(int v[], int** matrizCusto, int posA, int posB){
@@ -94,8 +155,8 @@ float probabilidadeAceitar(int v[], int posA, int posB, float temp, int** matriz
     return (exp(-1* deltaC / temp));
 }
 
-void startAnneling(int v[], int** matrizCusto){
-    int rotaMin[tamanho + 1];
+int* startAnneling(int v[], int** matrizCusto){
+    int* rotaMin = new int[tamanho + 1];
     for (int i = 0; i<tamanho; i++)
         rotaMin[i] = v[i];
     int custoMin = custo(v, matrizCusto);
@@ -110,12 +171,12 @@ void startAnneling(int v[], int** matrizCusto){
         }
         float deltaC = comparacao (v, matrizCusto, posA, posB);
         if (deltaC < 0){
-            swap(v, posA, posB);
+            changeSolution(v, posA, posB);
             mesmaSolucao = 0;
         }
         else{
             if ((rand() % 1000) < probabilidadeAceitar(v, posA, posB, temperatura, matrizCusto, deltaC) * 1000){
-                swap(v, posA, posB); 
+                changeSolution(v, posA, posB); 
                 mesmaSolucao = 0;
             }
             else
@@ -125,7 +186,7 @@ void startAnneling(int v[], int** matrizCusto){
         
         
         if (custoMin > custo(v, matrizCusto)){
-            for (int i = 0; i<tamanho; i++){
+            for (int i = 0; i<tamanho + 1; i++){
                 rotaMin[i] = v[i];
                 custoMin = custo(v, matrizCusto);
             }
@@ -137,9 +198,11 @@ void startAnneling(int v[], int** matrizCusto){
     cout << "numero solucao errada = " << cont - repeticoes << endl;
     cout << "Diferenca minimo achado pro real = " << custoMin - minimo << endl;
     cout<< "Rota minima: ";
-    for (int i = 0; i<tamanho; i++)
+    for (int i = 0; i<tamanho + 1; i++)
         cout << rotaMin[i] + 1 << " ";
     cout << endl << "Custo minimo: " << custoMin << endl;
+
+    return rotaMin;
 }
 
 
@@ -149,15 +212,14 @@ int main(){
     int** matrizCusto = newMatriz(tamanho);
     preencheMatriz(tamanho, matrizCusto);
 
-    int v[tamanho + 1];
+    int* v = new int[tamanho + 1];
     v[0] = 0;
     v[tamanho] = 0;
     for (int i = 1; i<tamanho; i++){
         v[i] = i;
     }
-    
-    int cont = 0;
-    startAnneling(v, matrizCusto);
+
+    v = startAnneling(v, matrizCusto);
 
     for (int i = 0; i < tamanho; ++i)
         delete[] matrizCusto[i];
