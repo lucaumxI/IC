@@ -4,16 +4,16 @@
 #include <fstream>
 #include <sstream>
 
-//  MEXER NAS FUNCOES COMPARACAO E PROBABILIDADEDEACEITAR, ELAS ESTAO USANDO A LOGICA DE SÓ TER O SWAP MAS ADICIONEI MAIS DOIS MÉTODOS
+// IMPLEMENTAR O INSERT SUBROTE
 
 
 using namespace std;
 
-int tamanho = 48;
+int tamanho = 17;
 float temperatura = 4000;
 float alpha = 0.99;
-int repeticoes = 60000;
-int minimo = 33523;
+int repeticoes = 1000;
+int minimo = 2085;
 
 int** newMatriz(int tamanho){
     int** matriz = new int*[tamanho];
@@ -25,7 +25,7 @@ int** newMatriz(int tamanho){
 }
 
 void preencheMatriz(int tamanho, int** matriz){
-    string nomeArquivo = "database/48 cidades (33523)/distance.txt";
+    string nomeArquivo = "database/17 cidades (2085)/distance.txt";
     ifstream arquivo(nomeArquivo);
 
     string linha;
@@ -130,38 +130,27 @@ void changeSolution(int* v, int posA, int posB){
 
 }
 
-float comparacao(int v[], int** matrizCusto, int posA, int posB){
-
-    int possivelEstado[tamanho + 1];
-
-    for (int i = 0; i<tamanho + 1 ;i++){
-        possivelEstado[i] = v[i];
-    }
-
-    swap(possivelEstado, posA, posB);
+float comparacao(int* v, int* possivelEstado, int** matrizCusto){
 
     return custo(possivelEstado, matrizCusto) - custo(v, matrizCusto);
 }
 
-float probabilidadeAceitar(int v[], int posA, int posB, float temp, int** matrizCusto, float deltaC){
-    int possivelEstado[tamanho + 1];
-
-    for (int i = 0; i<tamanho + 1 ;i++){
-        possivelEstado[i] = v[i];
-    }
-
-    swap(possivelEstado, posA, posB);
+float probabilidadeAceitar(float temp, float deltaC){
 
     return (exp(-1* deltaC / temp));
 }
 
 int* startAnneling(int v[], int** matrizCusto){
     int* rotaMin = new int[tamanho + 1];
-    for (int i = 0; i<tamanho; i++)
+    for (int i = 0; i<tamanho + 1; i++)
         rotaMin[i] = v[i];
     int custoMin = custo(v, matrizCusto);
     int cont = 0;
     int mesmaSolucao = 0;
+
+    int* possivelEstado = new int[tamanho + 1];
+    for (int i = 0; i<tamanho + 1; i++)
+        possivelEstado[i] = v[i];
 
     while (mesmaSolucao < repeticoes){
         int posA = 0, posB = 0;
@@ -169,15 +158,20 @@ int* startAnneling(int v[], int** matrizCusto){
             posA = rand() % (tamanho - 1) + 1;
             posB = rand() % (tamanho - 1) + 1;
         }
-        float deltaC = comparacao (v, matrizCusto, posA, posB);
+
+        changeSolution(possivelEstado, posA, posB);
+
+        float deltaC = comparacao (v, possivelEstado, matrizCusto);
         if (deltaC < 0){
-            changeSolution(v, posA, posB);
             mesmaSolucao = 0;
+            for (int i = 0; i<tamanho + 1; i++)
+                v[i] = possivelEstado[i];
         }
         else{
-            if ((rand() % 1000) < probabilidadeAceitar(v, posA, posB, temperatura, matrizCusto, deltaC) * 1000){
-                changeSolution(v, posA, posB); 
+            if ((rand() % 1000) < probabilidadeAceitar(temperatura, deltaC) * 1000){
                 mesmaSolucao = 0;
+                for (int i = 0; i<tamanho + 1; i++)
+                    v[i] = possivelEstado[i];
             }
             else
                 mesmaSolucao += 1;
@@ -195,12 +189,12 @@ int* startAnneling(int v[], int** matrizCusto){
         cont++;
     }
 
-    cout << "numero solucao errada = " << cont - repeticoes << endl;
-    cout << "Diferenca minimo achado pro real = " << custoMin - minimo << endl;
-    cout<< "Rota minima: ";
-    for (int i = 0; i<tamanho + 1; i++)
-        cout << rotaMin[i] + 1 << " ";
-    cout << endl << "Custo minimo: " << custoMin << endl;
+    //cout << "numero solucoes erradas = " << cont - repeticoes << endl;
+    //cout << "Diferenca minimo achado pro real = " << custoMin - minimo << endl;
+    //cout<< "Rota minima: ";
+    //for (int i = 0; i<tamanho + 1; i++)
+    //    cout << rotaMin[i] + 1 << " ";
+    //cout << endl << "Custo minimo: " << custoMin << endl;
 
     return rotaMin;
 }
@@ -219,7 +213,14 @@ int main(){
         v[i] = i;
     }
 
-    v = startAnneling(v, matrizCusto);
+    for (int i = 0; i < 1000; i++)
+        v = startAnneling(v, matrizCusto);
+
+    cout << "Diferenca minimo achado pro real = " << custo(v, matrizCusto) - minimo << endl;
+    cout<< "Rota minima: ";
+    for (int i = 0; i<tamanho + 1; i++)
+        cout << v[i] + 1 << " ";
+    cout << endl << "Custo minimo: " << custo(v, matrizCusto) << endl;
 
     for (int i = 0; i < tamanho; ++i)
         delete[] matrizCusto[i];
