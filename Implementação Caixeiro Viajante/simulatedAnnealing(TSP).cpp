@@ -9,12 +9,13 @@ using namespace std;
 
 //parametros iniciais
 
-int tamanho = 48;          //quantidade de cidades
-float temperatura = 4000;   //temperatura inicial
-float alpha = 0.99;         //taxa de resfriamento
-int loopInterno = 500;      //loop linha 168 (não pensei num nome melhor que loopInterno)
-int minimo = 33523;          //custo minimo para o problema especifico que esta tentando resolver
-int loopExterno = 1000;     //loop da linha 218 (não pensei num nome melhor que loopExterno)
+int tamanho = 5;          //quantidade de cidades
+float temperatura = 50;   //temperatura inicial
+float alpha = 0.9;         //taxa de resfriamento
+int loopInterno = tamanho;      //loop linha 168 (não pensei num nome melhor que loopInterno)
+int minimo = 19;          //custo minimo para o problema especifico que esta tentando resolver
+int runs = 1;          
+
 
 int** newMatriz(int tamanho){
     int** matriz = new int*[tamanho];       // Aloca memória para uma matriz tamanho x tamanho e retorna um ponteiro int** dela
@@ -26,7 +27,7 @@ int** newMatriz(int tamanho){
 }
 
 void preencheMatriz(int tamanho, int** matriz){
-    string nomeArquivo = "database/48 cidades (33523)/distance.txt";
+    string nomeArquivo = "database/5 cidades (19)/distance.txt";
     ifstream arquivo(nomeArquivo);
 
     string linha;
@@ -154,52 +155,48 @@ float probabilidadeAceitar(float temp, float deltaC){                       //ca
     return (exp(-1* deltaC / temp));
 }
 
-int* startAnneling(int v[], int** matrizCusto){
+int* startAnneling(int v[], int** matrizCusto, int* qntdSolucoesNovas){
     int* rotaMin = new int[tamanho + 1];                //declara a rotaMin para ser armazenado a melhor solucao que for encontrada
     for (int i = 0; i<tamanho + 1; i++)
         rotaMin[i] = v[i];
     int custoMin = custo(v, matrizCusto);
-    int mesmaSolucao = 0;
 
     int* possivelEstado = new int[tamanho + 1];     //declara possivelEstado para armazenar a nova possivel solucao
     for (int i = 0; i<tamanho + 1; i++)
         possivelEstado[i] = v[i];
 
-    while (mesmaSolucao < loopInterno){                 //so sai desse loop caso uma mesmaSolucao for "escolhida" um numero loopInterno de vezes
-        int posA = 0, posB = 0;                     //sorteia os indices que serao usados para criar a nova solucao
-        while (posA == posB){                       // caso as posicoes sorteadas sejam iguais, sorteia de novo para garantir que a nova solucao seja diferente da atual
-            posA = rand() % (tamanho - 1) + 1;
-            posB = rand() % (tamanho - 1) + 1;
-        }
+    while (1 < temperatura){
+        for (int i = 0; i<loopInterno; i++){
+            int posA = 0, posB = 0;                     //sorteia os indices que serao usados para criar a nova solucao
+            while (posA == posB){                       // caso as posicoes sorteadas sejam iguais, sorteia de novo para garantir que a nova solucao seja diferente da atual
+                posA = rand() % (tamanho - 1) + 1;
+                posB = rand() % (tamanho - 1) + 1;
+            }
 
-        changeSolution(possivelEstado, posA, posB);                     //altera a rota possivelEstado para criar uma solucao nova
+            changeSolution(possivelEstado, posA, posB);                     //altera a rota possivelEstado para criar uma solucao nova
+            *qntdSolucoesNovas = *qntdSolucoesNovas + 1;
 
-        float deltaC = comparacao (v, possivelEstado, matrizCusto);     //compara as rotas possivelEstado e v (poderia ter pensado num nome melhor) e armazena no float deltaC a diferenca entre elas
-        if (deltaC < 0){                            //caso deltaC negativo, a nova solucao é melhor que a atual
-            mesmaSolucao = 0;                       //zeramos o contador de mesmaSolucao
-            for (int i = 0; i<tamanho + 1; i++)     //copia a solucao possivelEstado para a rota v
-                v[i] = possivelEstado[i];
-        }
-        else{
-            if ((rand() % 1000) < probabilidadeAceitar(temperatura, deltaC) * 1000){    //caso deltaC positivo sorteia um numero entre 0 e 999 e caso ele seja menor que a probabilidadeAceitar consideramos essa nova solucao
-                mesmaSolucao = 0;                       //zera o contador de mesmaSolucao
-                for (int i = 0; i<tamanho + 1; i++)     //copia a solucao possivelEstado para a rota v 
+            float deltaC = comparacao (v, possivelEstado, matrizCusto);     //compara as rotas possivelEstado e v e armazena no float deltaC a diferenca entre elas
+            if (deltaC < 0){                            //caso deltaC negativo, a nova solucao é melhor que a atual
+                for (int i = 0; i<tamanho + 1; i++)     //copia a solucao possivelEstado para a rota v
                     v[i] = possivelEstado[i];
             }
-            else                    //caso deltaC positivo e o nao aceite a nova solucao
-                mesmaSolucao += 1;  //soma um no contador de mesmaSolucao
+            else{
+                if ((rand() % 1000) < probabilidadeAceitar(temperatura, deltaC) * 1000){    //caso deltaC positivo sorteia um numero entre 0 e 999 e caso ele seja menor que a probabilidadeAceitar consideramos essa nova solucao
+                    for (int i = 0; i<tamanho + 1; i++)     //copia a solucao possivelEstado para a rota v 
+                        v[i] = possivelEstado[i];
+                }              
+            }
             
-        }
-        
-        
-        if (custoMin > custo(v, matrizCusto)){          //caso a rota v seja melhor que a que esta armazenada no vetor custoMin
-            for (int i = 0; i<tamanho + 1; i++){        //copiamos o vetor v para o custoMin
-                rotaMin[i] = v[i];
-                custoMin = custo(v, matrizCusto);       //atribui o novo custoMin
+            
+            if (custoMin > custo(v, matrizCusto)){          //caso a rota v seja melhor que a que esta armazenada no vetor custoMin
+                for (int i = 0; i<tamanho + 1; i++){        //copiamos o vetor v para o custoMin
+                    rotaMin[i] = v[i];
+                    custoMin = custo(v, matrizCusto);       //atribui o novo custoMin
+                }
             }
         }
         temperatura = temperatura * alpha;
-
     }
     return rotaMin;                                     //retorna a rota de menor custo encontrada
 }
@@ -208,6 +205,8 @@ int* startAnneling(int v[], int** matrizCusto){
 int main(){
     srand(time(NULL));
 
+    int qntdSolucoes = 0;
+
     int** matrizCusto = newMatriz(tamanho);
     preencheMatriz(tamanho, matrizCusto);
 
@@ -215,8 +214,8 @@ int main(){
     
     startRote(v);
 
-    for (int i = 0; i < loopExterno; i++)
-        v = startAnneling(v, matrizCusto);
+    for (int i = 0; i < runs; i++)
+        v = startAnneling(v, matrizCusto, &qntdSolucoes);
 
     cout << "Diferenca minimo achado pro real (porcentagem) = " << 100*(custo(v, matrizCusto) - minimo)/minimo << endl;
     cout << "Diferenca minimo achado pro real (numero absoluto)= " << custo(v, matrizCusto) - minimo << endl;
@@ -224,6 +223,7 @@ int main(){
     for (int i = 0; i<tamanho + 1; i++)
         cout << v[i] + 1 << " ";
     cout << endl << "Custo minimo: " << custo(v, matrizCusto) << endl;
+    cout << "Quantia de soluções novas testadas: " << qntdSolucoes << endl;
 
     for (int i = 0; i < tamanho; ++i)
         delete[] matrizCusto[i];
