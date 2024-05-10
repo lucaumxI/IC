@@ -1,0 +1,285 @@
+#ifndef NODE_H
+#define NODE_H
+#include <iostream>
+#include "time.h"
+
+using namespace std;
+
+typedef struct Node *NodePtr;
+
+int tamanho = 10;
+
+
+struct Node{
+    int info;
+    struct Node *next;
+};
+typedef struct Node *nodePt;
+
+typedef struct{
+    nodePt primeiro;
+    nodePt ultimo;
+}listaEncadeada;
+
+
+void criar(listaEncadeada *l);
+bool vazio(listaEncadeada *l);
+void startLista(listaEncadeada *l);
+void insert(listaEncadeada *l, int elemento);
+void swap(listaEncadeada *l, int posA, int posB);
+void reinsert(listaEncadeada *l, int posA, int posB);
+void inverse(listaEncadeada *l, int posA, int posB);
+void reinsertSubRote(listaEncadeada *l, int posA, int posB, int posC);
+void imprime(listaEncadeada *l);
+float custo(listaEncadeada *l, int** matrizCusto);
+
+
+
+//----------------------------------------------------------------------------------------//
+
+void criar(listaEncadeada *l){
+    l->primeiro = NULL;
+    l->ultimo = NULL;
+}
+
+bool vazio(listaEncadeada *l){
+    bool flag;
+    if(l->primeiro == NULL)
+        flag = true;
+    else  
+        flag = false;
+
+    return flag;
+}
+
+void startLista(listaEncadeada *l){
+    int cont = 0;
+    
+    while (cont != tamanho){
+        insert(l, cont);
+        cont++;
+    }
+}
+
+void insert(listaEncadeada *l, int elemento){
+    nodePt lAux = new struct Node;
+    lAux->info = elemento;
+    if(vazio(l)){
+        l->primeiro = lAux;
+        l->ultimo = lAux;
+        l->ultimo->next = NULL;
+    }
+    else{
+        l->ultimo->next = lAux;
+        l->ultimo = lAux;
+        l->ultimo->next = NULL;
+    }
+}
+
+void imprime(listaEncadeada *l){
+    nodePt a = l->primeiro;
+    while(a != NULL){
+        cout << a->info << " ";
+        a = a->next;
+    }
+    cout << endl << endl;
+}
+
+//----------------------------------------------------------------------------------------//
+
+float custo(listaEncadeada *l, int** matrizCusto){
+    float soma = 0;
+    nodePt a = l->primeiro;
+    for (int i = 0; i < tamanho - 1; i++){
+        soma += matrizCusto[a->info][a->next->info];
+    }
+    soma += matrizCusto[l->ultimo->info][l->primeiro->info];
+}
+
+//----------------------------------------------------------------------------------------//
+
+void swap(listaEncadeada *l, int posA, int posB){
+    int index = 0;
+    nodePt iteratorA = l->primeiro;
+    nodePt iteratorauxA;
+    nodePt iteratorauxB;
+    nodePt iteratorB = l->primeiro;
+    while (index < posA - 1){
+        iteratorA = iteratorA->next;
+        index++;
+    }
+
+    index = 0;
+    while (index < posB - 1){
+        iteratorB = iteratorB->next;
+        index++;
+    }
+
+    if (posB == posA + 1){
+        reinsert(l, posA, posB);
+    }
+    else{
+        iteratorauxA = iteratorA->next;
+        iteratorA->next = iteratorB->next;
+        iteratorauxB = iteratorB->next->next;
+        iteratorB->next->next = iteratorauxA->next;
+        iteratorB->next = iteratorauxA;
+        iteratorauxA->next = iteratorauxB;
+    }
+}
+
+void reinsert(listaEncadeada *l, int posA, int posB){
+    int index = 0;
+    nodePt iteratorA;
+    nodePt iteratorPrevposA = l->primeiro;
+    nodePt iteratorposB;
+    nodePt iteratorB = l->primeiro;
+    while (index < posA - 1){
+        iteratorPrevposA = iteratorPrevposA->next;
+        index++;
+    }
+
+    index = 0;
+    while (index < posB){
+        iteratorB = iteratorB->next;
+        index++;
+    }
+
+    iteratorA = iteratorPrevposA->next;
+    iteratorposB = iteratorB->next;
+    
+    iteratorPrevposA->next = iteratorA->next;
+    iteratorB->next = iteratorA;
+    iteratorA->next = iteratorposB;
+}
+
+void inverse(listaEncadeada *l, int posA, int posB){
+    for (posA; posA < posB; posA++){
+        swap(l, posA, posB);
+        posB--;
+    }
+}
+
+void reinsertSubRote(listaEncadeada *l, int posA, int posB, int posC){
+    int index = 0;
+
+        //Caso 1: posC está após posB:
+    if (posC > posB){
+        nodePt prevA = l->primeiro;
+        nodePt A;
+        nodePt B;
+        nodePt C;
+        nodePt nextC;
+
+        while (index < posA - 1){
+            prevA = prevA->next;
+            index++;
+        }
+        A = prevA->next;
+        index = 0;
+
+        while (index < posB){
+            B = B->next;
+            index++;
+        }
+        index = 0;
+
+        while (index < posC){
+            C = C->next;
+            index++;
+        }
+        nextC = C->next;
+
+
+        prevA->next = B;
+        C->next = A;
+        B->next = nextC;
+    }
+
+        //Caso 2: posC está antes de posA:
+    if(posC < posA){   
+        nodePt A;
+        nodePt prevA;
+        nodePt B;
+        nodePt nextB;
+        nodePt C;
+        nodePt prevC;
+        
+        while (index < posA - 1){
+            prevA = prevA->next;
+            index++;
+        }
+        A = prevA->next;
+        index = 0;
+
+         while (index < posB){
+            B = B->next;
+            index++;
+        }
+        nextB = B->next;
+        index = 0;
+
+        while (index < posC - 1){
+            prevC = prevC->next;
+            index++;
+        }
+        C = prevC->next;
+
+        prevC->next = A;
+        B->next = C;
+        prevA->next = nextB; 
+    }
+
+        //Caso 3: posC está entre posA e posB:
+    if(posC> posA && posC<posB){
+        nodePt A;
+        nodePt B;
+        nodePt nextB;
+        nodePt C;
+        nodePt D;
+        nodePt prevD;
+        nodePt E;
+
+        while (index < posA){
+            A = A->next;
+            index++;
+        }
+        index = 0;
+
+        while (index < posB){
+            B = B->next;
+            index++;
+        }
+        nextB = B->next;
+        index = 0;
+
+        while (index < posC){
+            C = C->next;
+            index++;
+        }
+        index = 0;
+
+
+
+
+    }
+        
+
+    
+    /*
+        Restrição: posC sempre diferente de posA e posB
+        Caso 1: posC está após o posB
+            anteriorA->next = B
+            C->next = A
+            B->next = proximoC
+        Caso 2: posC está antes de posA:
+            anteriorC->next = A
+            B->next = C
+            anteriorA->next = proximoB
+
+    */
+
+}
+
+//----------------------------------------------------------------------------------------//
+#endif
