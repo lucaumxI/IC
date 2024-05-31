@@ -6,49 +6,127 @@
 #include <bits/stdc++.h>
 #include <fstream>
 #include <sstream>
+#include <string>
 
 using namespace std;
 
 
 //-----------------------------------------Parametros------------------------------------------//
 
-float orcamento = 100;
+float orcamento = 5000;
 float alpha = 0.9;
-int qntAcoes = 50;
+int qntAcoes = 99;
 int temperaturaInicial = 5000;
-float aversao = 0;
+float aversao = 0.5;
 int cadeiaMarkov = 1;
+float porcentagem = 0.15;
+int runs = 1;
 
 //-----------------------------------------Assinatura funções------------------------------------------//
 
-int** startMatrizCovariancia();
-int* startVetorPreco();
-int* startVetorRetorno();
-float lambda(int* vetorPreco, int* vetorRetorno, int** covariancia, int* v);
-float comparacao(int* vetorPreco, int* vetorRetorno, int** covariancia, int* v, int* possivelEstado);
+double** startMatrizCovariancia();
+double* startVetorPreco();
+double* startVetorRetorno();
+float lambda(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v);
+float comparacao(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v, int* possivelEstado);
 float probabilidadeAceitar(int temperatura, float deltaL);
-void changeSolution(int* solucao);
+void changeSolution(int* solucao, double* preco);      //||
 void startAnnealing(int* v);
 void copiarVetor(int* v, int* n);
-float custo(int* preco, int* v);
-int* startSolucao();
+float custo(double* preco, int* v);
+int* startSolucao();                    //||
+void bitFlip(int* solucao, double* preco);
+int porcentagemOrcamento(double* preco, float orcamento, int pos);
 
 //----------------------------------------Funções para manipulação dos vetores de input------------------------------------------------//
 
-int** startMatrizCovariancia(){     // NÃO IMPLEMENTEI NENHUMA POIS AINDA VOU VER COMO SE DÁ A ENTRADA
+double** startMatrizCovariancia(){
+    double** matriz = new double*[qntAcoes];
+    for(int i = 0; i<qntAcoes; i++)
+        matriz[i] = new double[qntAcoes];
 
+    ifstream file("database/99_ativos/matriz_covariancia_10.txt");
+    if (!file.is_open()) {
+        cerr << "Erro ao abrir o arquivo " << endl;
+        abort();
+    }
+
+    for (int i = 0; i < qntAcoes; ++i) {
+        for (int j = 0; j < qntAcoes; ++j) {
+            file >> matriz[i][j];
+            if (file.fail()) {
+                cerr << "Erro ao ler o valor na posição [" << i << "][" << j << "]." << endl;
+                abort();
+            }
+        }
+    }
+
+    file.close();
+
+    return matriz;
 }
 
-int* startVetorPreco(){
 
+double* startVetorPreco(){
+    ifstream file("database/99_ativos/precos_10.txt", ios::in);
+    if (!file.is_open()) {
+        cerr << "Erro ao abrir o arquivo " << endl;
+        abort();
+    }
+    
+    double* valores = new double[qntAcoes];
+    
+    string line;
+    int index = 0;
+    while (getline(file, line)) {
+        valores[index] = stod(line);
+        index++;
+    }
+    
+    file.close();
+    
+    if (index != qntAcoes) {
+        cerr << "Erro: o arquivo não contém exatamente 99 linhas." << std::endl;
+        abort();
+    }
+
+    return valores;
 }
 
-int* startVetorRetorno(){
+double* startVetorRetorno(){
+    ifstream file("database/99_ativos/retornos_esperados_10.txt", ios::in);
+    if (!file.is_open()) {
+        cerr << "Erro ao abrir o arquivo " << endl;
+        abort();
+    }
+    
+    double* valores = new double[qntAcoes];
+    
+    string line;
+    int index = 0;
+    while (getline(file, line)) {
+        valores[index] = stod(line);
+        index++;
+    }
+    
+    file.close();
+    
+    if (index != qntAcoes) {
+        cerr << "Erro: o arquivo não contém exatamente 99 linhas." << std::endl;
+        abort();
+    }
 
+    return valores;
 }
+
 
 int* startSolucao(){
+    int* vetor = new int[qntAcoes];
 
+    for (int i = 0; i<qntAcoes; i++)
+        vetor[i] = 0;
+    
+    return vetor;
 }
 
 void copiarVetor(int* vetorOriginal, int* vetorAlvo){
@@ -56,9 +134,9 @@ void copiarVetor(int* vetorOriginal, int* vetorAlvo){
         vetorAlvo[i] = vetorOriginal[i];
 }
 
-//----------------------------------------Funções do annealing------------------------------------------------//
+//----------------------------------------Funções do annealing------------------------------------------------//            testar
 
-float lambda(int* vetorPreco, int* vetorRetorno, int** covariancia, int* v){
+float lambda(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v){
     float resultado = 0;
     float a = 0;
     float b = 0;
@@ -68,11 +146,11 @@ float lambda(int* vetorPreco, int* vetorRetorno, int** covariancia, int* v){
         }
         b += vetorRetorno[i]*vetorPreco[i]*v[i];
     }
-    resultado = -1*aversao*a - b;
+    resultado = -1*(aversao*a - b);
     return resultado;
 }
 
-float comparacao(int* vetorPreco, int* vetorRetorno, int** covariancia, int* v, int* possivelEstado){
+float comparacao(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v, int* possivelEstado){
     return lambda(vetorPreco, vetorRetorno, covariancia, possivelEstado) - lambda(vetorPreco, vetorRetorno, covariancia, v);
 }
 
@@ -80,25 +158,50 @@ float probabilidadeAceitar(int temperatura, float deltaL){
     return (exp(-1* deltaL / temperatura));
 }
 
-float custo(int* preco, int* v){
+float custo(double* preco, int* v){
     float soma = 0;
     for (int i = 0; i < qntAcoes; i++)
         soma += preco[i]*v[i];
     return soma;
 }
 
-//----------------------------------------Novas soluções------------------------------------------------//
+//----------------------------------------Novas soluções------------------------------------------------//      testar
 
-void changeSolution(int* solucao){  //PRECISO PENSAR AINDA EM COMO CRIAR NOVAS SOLUÇÕES PARA ESSE PROBLEMA
+void changeSolution(int* solucao, double* preco){
+    int function = rand() % 1;
 
+    switch (function){
+        case 0:
+            bitFlip(solucao, preco);
+            break;
+    }
 }
 
-//----------------------------------------annealing------------------------------------------------//
+void bitFlip(int* solucao, double* preco){
+    int pos = rand() % 99;
+
+    if(solucao[pos] > 0)
+        solucao[pos] = 0;
+    else{
+        solucao[pos] = rand() % porcentagemOrcamento(preco, orcamento, pos);
+        while(custo(preco, solucao) > orcamento){
+            solucao[pos]--;
+        }
+    }
+}
+
+int porcentagemOrcamento(double* preco, float orcamento, int pos){
+    double valor = orcamento * porcentagem;
+
+    return valor/preco[pos];
+}
+
+//----------------------------------------annealing------------------------------------------------//       testar
 
 void startAnnealing(int* v){
-    int* preco = startVetorPreco();
-    int* retorno = startVetorRetorno();
-    int** covariancia = startMatrizCovariancia();
+    double* preco = startVetorPreco();
+    double* retorno = startVetorRetorno();
+    double** covariancia = startMatrizCovariancia();
 
     int retornoMax[qntAcoes];
     copiarVetor(v, retornoMax);
@@ -111,12 +214,12 @@ void startAnnealing(int* v){
 
     while(temperatura > 0.5){
         for(int i = 0; i<cadeiaMarkov; i++){
-            changeSolution(possivelSolucao);
+            changeSolution(possivelSolucao, preco);
 
             bool flag = false;
             while(!flag){
                 if(custo(preco, possivelSolucao) > orcamento)
-                    changeSolution(possivelSolucao);
+                    changeSolution(possivelSolucao, preco);
                 else    
                     flag = true;
             }
@@ -136,6 +239,7 @@ void startAnnealing(int* v){
         }
         temperatura = temperatura * alpha;
     }
+    cout << "Lambda: " << lambda(preco, retorno, covariancia, v) << endl << "Custo: " << custo(preco, v) << endl;
 }
 
 #endif
