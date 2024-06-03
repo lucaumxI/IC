@@ -37,6 +37,7 @@ float custo(double* preco, int* v);
 int* startSolucao();                    //||
 void bitFlip(int* solucao, double* preco);
 int porcentagemOrcamento(double* preco, float orcamento, int pos);
+void addAcao(int* solucao, double* preco);
 
 //----------------------------------------Funções para manipulação dos vetores de input------------------------------------------------//
 
@@ -167,13 +168,15 @@ float custo(double* preco, int* v){
 
 //----------------------------------------Novas soluções------------------------------------------------//      testar
 
-void changeSolution(int* solucao, double* preco){
-    int function = rand() % 1;
+void changeSolution(int* solucao, double* preco){       //soma 1 em uma ação aleatoria
+    int function = rand() % 2;
 
     switch (function){
         case 0:
             bitFlip(solucao, preco);
             break;
+        case 1:
+            addAcao(solucao, preco);
     }
 }
 
@@ -187,6 +190,16 @@ void bitFlip(int* solucao, double* preco){
         while(custo(preco, solucao) > orcamento){
             solucao[pos]--;
         }
+    }
+}
+
+void addAcao(int* solucao, double* preco){
+    int pos = rand() % 99;
+
+    if(solucao[pos] < porcentagemOrcamento(preco, orcamento, pos)){
+        solucao[pos]++;
+        if(custo(preco, solucao) > orcamento)
+            solucao[pos]--;
     }
 }
 
