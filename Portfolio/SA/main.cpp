@@ -23,7 +23,7 @@ void imprimeVetorSolucoes(){
 int main(){                 //testar mudando a aversão primeiro com 0 depois vai variando conforme o gosto do fregues
     srand(time(NULL));
 
-    imprimeVetorSolucoes();
+    annealing();
 
 
     return 0;
