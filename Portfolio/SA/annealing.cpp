@@ -19,7 +19,7 @@ float orcamento = 10000;
 float alpha = 0.55;
 int qntAcoes = 73;
 int temperaturaInicial = 10000;
-float aversao = 0.15;
+float aversao = 0.01;
 int cadeiaMarkov = 20;
 float porcentagem = 0.12;
 int runs = 1;
@@ -54,7 +54,7 @@ double** startMatrizCovariancia(){
     for(int i = 0; i<qntAcoes; i++)
         matriz[i] = new double[qntAcoes];
 
-    ifstream file("database\\outros ai pra eu testar\\may\\24_may/covariancia.txt");
+    ifstream file("database\\outros ai pra eu testar\\feb\\16_Feb/covariancia.txt");
     if (!file.is_open()) {
         cerr << "Erro ao abrir o arquivo covariancia" << endl;
         abort();
@@ -103,7 +103,7 @@ double* startVetorPreco(){
 }
 
 double* startVetorRetorno(){
-    ifstream file("database\\outros ai pra eu testar\\may\\24_may/retorno.txt", ios::in);
+    ifstream file("database\\outros ai pra eu testar\\feb\\16_Feb/retorno.txt", ios::in);
     if (!file.is_open()) {
         cerr << "Erro ao abrir o arquivo retorno" << endl;
         abort();
