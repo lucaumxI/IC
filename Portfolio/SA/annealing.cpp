@@ -9,62 +9,82 @@
 #include <string>
 #include <chrono>
 #include <windows.h>
+#include <iomanip>
 
 using namespace std;
 
 
+//-----------------------------------------Observações-------------------------------------------//
+/*
+    Modificacoes proposta:
+        - modificar o loop que pega as entradas no SA para fazer isso automaticamente usando os valores de 0-n dos nomes dos .txt - CHECK
+        - fazer funcao para salvar as informacoes pertinentes de cada dia (lambda, orcamento e custo)
+        - testar TUDO novamente se está funcionando
+        - verificar se é possivel otimizar algo
+        - calcular o O(n)
+        - ao inves de usar flag no vetorPreco criar um vetor de entrada novo p/ dizer as acoes elegiveis
+        - deixar as coisas mais bonitinhas criando zilhoes de funcoes p/ por exemplo limpar e salvar os dados nos arquivos
+    Condicoes para elegibilidade de uma acao:
+        - a acao precisa ter um numero minimo de valores registrados na tabela. Valor minimo definido em outro algoritmo
+        - para cada portfolio, uma acao pode custar no maximo uma porcentagem do orcamento. Valor porcentagem definido abaixo
+        - o portfolio tem que ser menor que o orcamento. Valor orcamento definido abaixo
+*/
+
+
 //-----------------------------------------Parametros------------------------------------------//
-
 float orcamento = 10000;
-float alpha = 0.55;
-int qntAcoes = 73;
-int temperaturaInicial = 10000;
+float alpha = 0.96;
+int qntAcoes = 10;
+double temperaturaInicial = 90;
 float aversao = 0.01;
-int cadeiaMarkov = 20;
+int cadeiaMarkov = 2*qntAcoes;
 float porcentagem = 0.12;
-int runs = 1;
-bool testarParametros = false;
-string caminho;
 
+string strCovariancia = "database/simulacao/covariancia/";
+string strPreco = "database/simulacao/preco/";
+string strValorEsperado = "database/simulacao/valor_esperado/";
+string strFlag = "database/simulacao/flag/";
+string strOrcamento = "resultados/orcamento";
+string strCusto = "resultados/custo";
+string strLambda = "resultados/lambda";
+string strOrcamentoFinalDia = "resultados/orcamentoFinal";
+string strCarteira = "resultados/vetor";
 //-----------------------------------------Assinatura funções------------------------------------------//
 
-double** startMatrizCovariancia();
-double* startVetorPreco();
-double* startVetorRetorno();
-float lambda(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v);
-float comparacao(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v, int* possivelEstado);
-float probabilidadeAceitar(int temperatura, float deltaL);
-void changeSolution(int* solucao, double* preco, double* retorno);
-void startAnnealing(int* v, double* preco, double* retorno, double** covariancia);
+double** startMatrizCovariancia(string caminho);
+double* startVetorPreco(string caminho);
+double* startVetorRetorno(string caminho);
+double lambda(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v);
+double comparacao(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v, int* possivelEstado);
+double probabilidadeAceitar(double temperatura, double deltaL);
+void changeSolution(int* solucao, double* preco, double* retorno, int* flag);
+void startAnnealing(int* v, double* preco, double* retorno, double** covariancia, int* flag);
 void copiarVetor(int* v, int* n);
 float custo(double* preco, int* v);
-void venderAcoes(int* v, double* preco);
+void venderAcoes(int* v, int d);
 int* startSolucao();
 int porcentagemOrcamento(double* preco, float orcamento, int pos);
-void testeParametros(double* preco, double* retorno, double** covariancia);
 void annealing();
-void imprimeVetorSolucoes(int* v);
-
-float mediaLambda;
+bool vetorZerado(int* v);
 
 //----------------------------------------Funções para manipulação dos vetores de input------------------------------------------------//
 
-double** startMatrizCovariancia(){
+double** startMatrizCovariancia(string caminho){      //Cria a matriz de covariancia
     double** matriz = new double*[qntAcoes];
     for(int i = 0; i<qntAcoes; i++)
         matriz[i] = new double[qntAcoes];
 
-    ifstream file("database\\outros ai pra eu testar\\feb\\16_Feb/covariancia.txt");
-    if (!file.is_open()) {
-        cerr << "Erro ao abrir o arquivo covariancia" << endl;
+    ifstream file(caminho);    //caminho do arquivo (alterar isso pra ficar amis bonitinho)
+    if (!file.is_open()) {                                                              //Veritica se o caminho ta correto
+        cerr << "Erro ao abrir o arquivo covariancia" << std::strerror(errno) << endl;
         abort();
     }
 
-    for (int i = 0; i < qntAcoes; ++i) {
+    for (int i = 0; i < qntAcoes; ++i) {                                                //le os valores do arquivo
         for (int j = 0; j < qntAcoes; ++j) {
             file >> matriz[i][j];
             if (file.fail()) {
-                cerr << "Erro ao ler o valor na posição [" << i << "][" << j << "]." << endl;
+                cerr << "Erro ao ler o valor na posição [" << i << "][" << j << "]." << endl;   //se ocorrer algum erro na posicao i,j avisa
                 abort();
             }
         }
@@ -76,34 +96,40 @@ double** startMatrizCovariancia(){
 }
 
 
-double* startVetorPreco(){
-    ifstream file(caminho, ios::in);
+double* startVetorPreco(string caminho){              //cria o arquivo de precos
+    ifstream file(caminho, ios::in);        //abre o arquivo e verifica se conseguiu abrir
     if (!file.is_open()) {
         cerr << "Erro ao abrir o arquivo preco" << endl;
         abort();
     }
     
-    double* valores = new double[qntAcoes];
+    double* valores = new double[qntAcoes];     //instancia o vetor
     
     string line;
     int index = 0;
-    while (getline(file, line)) {
+    while (getline(file, line)) {       //vai pegando cada linha do arquivo, pois separa cada valor com \n
+        if (line == "nan"){             //caso a linha seja "nan", atribui o valor como -1. nan vai ser escrito caso a acao n seja elegivel, ou seja, nao tem dados o bastante para fazer a analise, ai salva como nan para usar com flag
+            valores[index] = -1;
+            index++;
+        }
+        else{                       //se n for nan pega o valor da linha e salva no vetor
         valores[index] = stod(line);
         index++;
+        }
     }
     
     file.close();
     
     if (index != qntAcoes) {
-        cerr << "Erro: o arquivo não contém exatamente 99 linhas." << std::endl;
+        cerr << "Erro: o arquivo preco não contém o numero especificado de elementos." << std::endl;
         abort();
     }
 
     return valores;
 }
 
-double* startVetorRetorno(){
-    ifstream file("database\\outros ai pra eu testar\\feb\\16_Feb/retorno.txt", ios::in);
+double* startVetorRetorno(string caminho){            //apenas pega os valores do aqrquivo e salva no vetor
+    ifstream file(caminho, ios::in);
     if (!file.is_open()) {
         cerr << "Erro ao abrir o arquivo retorno" << endl;
         abort();
@@ -121,7 +147,7 @@ double* startVetorRetorno(){
     file.close();
     
     if (index != qntAcoes) {
-        cerr << "Erro: o arquivo não contém exatamente 99 linhas." << std::endl;
+        cerr << "Erro: o arquivo retorno não contém o numero especificado de elementos." << std::endl;
         abort();
     }
 
@@ -129,7 +155,7 @@ double* startVetorRetorno(){
 }
 
 
-int* startSolucao(){
+int* startSolucao(){                    //inicia o vetor de solucao com 0 em cada posicao
     int* vetor = new int[qntAcoes];
 
     for (int i = 0; i<qntAcoes; i++)
@@ -138,17 +164,43 @@ int* startSolucao(){
     return vetor;
 }
 
-void copiarVetor(int* vetorOriginal, int* vetorAlvo){
+void copiarVetor(int* vetorOriginal, int* vetorAlvo){               //vetor alvo recebe uma copia do vetor original
     for(int i = 0; i < qntAcoes ; i++)
         vetorAlvo[i] = vetorOriginal[i];
 }
 
+int* startFlag(string caminho){
+    ifstream file(caminho, ios::in);
+    if (!file.is_open()) {
+        cerr << "Erro ao abrir o arquivo flag" << endl;
+        abort();
+    }
+    
+    int* valores = new int[qntAcoes];
+    
+    string line;
+    int index = 0;
+    while (getline(file, line)) {
+        valores[index] = stod(line);
+        index++;
+    }
+    
+    file.close();
+    
+    if (index != qntAcoes) {
+        cerr << "Erro: o arquivo flag não contém o numero especificado de elementos." << std::endl;
+        abort();
+    }
+
+    return valores;
+}
+
 //----------------------------------------Funções do annealing------------------------------------------------//            testar
 
-float lambda(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v){
-    float resultado = 0;
-    float a = 0;
-    float b = 0;
+double lambda(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v){       //calculo da f.o
+    double resultado = 0;
+    double a = 0;
+    double b = 0;
     for(int i = 0; i < qntAcoes; i++){
         for(int j = 0; j < qntAcoes; j++){
             a += covariancia[i][j]*vetorPreco[i]*vetorPreco[j]*v[i]*v[j];
@@ -159,206 +211,178 @@ float lambda(double* vetorPreco, double* vetorRetorno, double** covariancia, int
     return resultado;
 }
 
-float comparacao(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v, int* possivelEstado){
+double comparacao(double* vetorPreco, double* vetorRetorno, double** covariancia, int* v, int* possivelEstado){                  //compara se a solucao atual é melhor que a proposta
     return lambda(vetorPreco, vetorRetorno, covariancia, possivelEstado) - lambda(vetorPreco, vetorRetorno, covariancia, v);
 }
 
-float probabilidadeAceitar(int temperatura, float deltaL){
+double probabilidadeAceitar(double temperatura, double deltaL){  //calcula a chance de aceitar a solucao propsota mesmo sendo pior
     return (exp(-1* deltaL / temperatura));
 }
 
-float custo(double* preco, int* v){
+float custo(double* preco, int* v){     //calculo do preco total do portfolio criado
     float soma = 0;
     for (int i = 0; i < qntAcoes; i++)
         soma += preco[i]*v[i];
     return soma;
 }
 
-void venderAcoes(int* v, double* preco){
-    for (int i = 0; i < qntAcoes; i++){
-        orcamento += v[i]*preco[i];
-        v[i] = 0;
+void venderAcoes(int* v, int d){        //vende todas as acaos do portfolio
+    if (d != 0){
+        double* precoAtual = startVetorPreco(strPreco + "N" + to_string(qntAcoes) + "_" + to_string(d)  + ".txt");
+        double* precoAnterior = startVetorPreco(strPreco + "N" + to_string(qntAcoes) + "_" + to_string(d)  + ".txt");
+        for (int i = 0; i < qntAcoes; i++){
+            if (precoAnterior[i] < precoAtual[i]){
+                orcamento = orcamento + precoAtual[i]*v[i];
+                v[i] = 0;
+            }
+        }
+        if (d == 9){
+            orcamento = orcamento + custo(precoAtual, v);
     }
+
+        delete[] precoAtual;
+        delete[] precoAnterior;
+    }
+
 }
 
 //----------------------------------------Novas soluções------------------------------------------------//      testar
 
-void changeSolution(int* solucao, double* preco, double* retorno){       //soma 1 em uma ação aleatoria
-    int pos = rand() % qntAcoes;
-    int op = rand() % 2;
+void changeSolution(int* solucao, double* preco, double* retorno, int* flag){       //soma 1 ou -1 em uma ação aleatoria caso ela seja elegivel
+    int pos = rand() % qntAcoes;                    //sorteia a acao
+    int op = 1;                            //sorteia se ira somar ou subtrair a acao
 
-    if(retorno[pos] > 0){
+    if (flag[pos] == 1){                //compara com 0 pois definimos anteriormente que a flag seria um preco[pos] = -1
         if(op){
             solucao[pos]++;
-            if(custo(preco, solucao) > orcamento)
+            if(custo(preco, solucao) > orcamento)       //verifica se extrapola orcamento maximo
                 solucao[pos]--;
-            if(solucao[pos] > porcentagemOrcamento(preco, orcamento, pos))
+            if(solucao[pos] > porcentagemOrcamento(preco, orcamento, pos))      //verifica se extrapola a procentagem maxima
                 solucao[pos]--;
-        }
-        else{
-            if(solucao[pos] != 0)   
-                solucao[pos]--;
+            
         }
     }
 }
 
-int porcentagemOrcamento(double* preco, float orcamento, int pos){
+int porcentagemOrcamento(double* preco, float orcamento, int pos){      //retorno um int indicando quantas acoes i podemos comprar para nao extraploar o limite de ocamento p/ cada acao
     double valor = orcamento * porcentagem;
 
     return valor/preco[pos];
 }
-//----------------------------------------annealing------------------------------------------------//       testar
-void testeParametros(double* preco, double* retorno, double** covariancia){
-    float menorLambda = 0;
-    float melhorAlpha;
-    int melhorTemp;
-    int melhorMarkov;
-    testarParametros = true;
-    mediaLambda = 0;
-    int* v;
-    orcamento = 10000;
-
-    alpha = 0.85;
-    temperaturaInicial = 80000;
-    cadeiaMarkov = 50;
-    
-    while(alpha >= 0.5){
-        for(int i = 0; i<50; i++){
-            v = startSolucao();
-            startAnnealing(v, preco, retorno, covariancia);
-            orcamento = 10000;
-        }
-        mediaLambda = mediaLambda/50;
-        if (menorLambda == 0){
-            menorLambda = mediaLambda;
-            melhorAlpha = alpha;
-        }
-        if (menorLambda > mediaLambda){
-            menorLambda = mediaLambda;
-            melhorAlpha = alpha;
-        }
-        alpha = alpha - 0.05;
-        mediaLambda = 0; 
+//----------------------------------------annealing------------------------------------------------//  
+bool vetorZerado(int* v) {
+    for (int i = 0; i < qntAcoes; i++) {
+        if (v[i] != 0) return false;
     }
-    alpha = 0.9;
-    menorLambda = 0;
-    cout << "Terminou alpha" << endl;
-
-    
-    temperaturaInicial = 300000;
-    while(temperaturaInicial >= 50000){
-        for(int i = 0; i<50; i++){
-            int* v = startSolucao();
-            startAnnealing(v, preco, retorno, covariancia);
-            orcamento = 10000;
-        }
-        mediaLambda = mediaLambda/50;
-        if (menorLambda == 0)
-            menorLambda = mediaLambda;
-        if (menorLambda > mediaLambda){
-            menorLambda = mediaLambda;
-            melhorTemp = temperaturaInicial;
-        }
-        temperaturaInicial = temperaturaInicial - 10000;
-        mediaLambda = 0;
-    }
-    temperaturaInicial = 80000;
-    menorLambda = 0;
-    cout << "Terminou temperatura" << endl;
-
-    cadeiaMarkov = 200;
-    while(cadeiaMarkov >= 1){
-        for(int i = 0; i<50; i++){
-            int* v = startSolucao();
-            startAnnealing(v, preco, retorno, covariancia);
-            orcamento = 10000;
-        }
-        mediaLambda = mediaLambda/50;
-        if (menorLambda == 0)
-            menorLambda = mediaLambda;
-        if (menorLambda > mediaLambda){
-            menorLambda = mediaLambda;
-            melhorMarkov = cadeiaMarkov;
-        }
-        cadeiaMarkov = cadeiaMarkov - 20;
-    }
-    cout << "Terminou Markov" << endl;
-
-    alpha = melhorAlpha;
-    cadeiaMarkov = melhorMarkov;
-    temperaturaInicial = melhorTemp;
-}
-
-void startAnnealing(int* v, double* preco, double* retorno, double** covariancia){ 
-    int* possivelSolucao = startSolucao();    
-        for (int p = 0; p < runs; p++){
-            int temperatura = temperaturaInicial;
-            while(temperatura > 0.5){
-                for(int i = 0; i<cadeiaMarkov; i++){
-                    changeSolution(possivelSolucao, preco, retorno);
-                    float deltaL = comparacao(preco, retorno, covariancia, v, possivelSolucao);
-                    if(deltaL < 0)
-                        copiarVetor(possivelSolucao, v);
-                    else{
-                        if((rand()%1000) < probabilidadeAceitar(temperatura, deltaL) * 1000)
-                            copiarVetor(possivelSolucao, v);
-                    }
-                }
-                temperatura = temperatura * alpha;
-            }
-        }
-
-        orcamento = orcamento - custo(preco, v);
+    return true;
+}  
+void startAnnealing(int* v, double* preco, double* retorno, double** covariancia, int* flag){
+    int* possivelSolucao = startSolucao();
+    copiarVetor(v , possivelSolucao);
+        double temperatura = temperaturaInicial;
         
-        if (testarParametros){
-            mediaLambda += lambda(preco, retorno, covariancia, v);
+        while(temperatura > 0.0001){
+            for(int i = 0; i<cadeiaMarkov; i++){
+                changeSolution(possivelSolucao, preco, retorno, flag);
+                double deltaL = comparacao(preco, retorno, covariancia, v, possivelSolucao);
+                if(deltaL < 0)
+                    copiarVetor(possivelSolucao, v);
+                else{
+                    double r = rand()%1000;
+ 
+                    if((r/1000) < probabilidadeAceitar(temperatura, deltaL)){
+                        copiarVetor(possivelSolucao, v);
+                    }
+                    else
+                        copiarVetor(v , possivelSolucao);
+                }
+            }
+            temperatura = temperatura * alpha;
         }
-        delete possivelSolucao;
+        orcamento = orcamento - custo(preco, v);
+
+        delete[] possivelSolucao;
 }
 
-void annealing(){  
-    double* retorno = startVetorRetorno();
-    double* preco;
-    double** covariancia = startMatrizCovariancia();
-    int* v = startSolucao();
-    bool flag = true;
+void annealing(){
+    int dias = 10;
+        int* v = startSolucao();
 
-    while(flag){
-        cout << "Digite o caminho do arquivo de precos: ";
-        getline(cin, caminho);
-        preco = startVetorPreco();
+        /*
+        ofstream file;
+        file.open("resultados/custo.txt");  
+        file.close();
+        file.open("resultados/lambda.txt");  
+        file.close();  
+        file.open("resultados/orcamento.txt");  
+        file.close();  
+        */
+        string parametro = (to_string(aversao));
 
-        venderAcoes(v, preco);
-        float auxOrcamento = orcamento;
-        testeParametros(preco, retorno, covariancia);
+        orcamento = 10000;
 
-        orcamento = auxOrcamento;
-        cout << "Orcamento: " << orcamento << endl;
-        startAnnealing(v, preco, retorno, covariancia);
+        for(int d = 0; d < dias; d++){   
+            double* valorEsperado = startVetorRetorno(strValorEsperado + "N" + to_string(qntAcoes) + "_" + to_string(d)  + ".txt");
+            double* preco = startVetorPreco(strPreco + "N" + to_string(qntAcoes) + "_" + to_string(d)  + ".txt");
+            double** covariancia = startMatrizCovariancia(strCovariancia + "N" + to_string(qntAcoes) + "_" + to_string(d)  + ".txt");
+            int* flag = startFlag(strFlag + "N" + to_string(qntAcoes) + "_" + to_string(d)  + ".txt");
 
-        cout << "Vetor encontrado: ";
-        for (int i = 0; i < qntAcoes; i++){
-            cout << v[i] << " ";
+
+            venderAcoes(v, d);
+
+
+            ofstream arquivo;
+            arquivo.open(strOrcamento + ".txt", ios::app);
+            arquivo << orcamento;
+            arquivo << "\n";
+            arquivo.close();
+
+            float auxOrcamento = orcamento;
+            //testeParametros(preco, valorEsperado, covariancia, flag);
+
+            orcamento = auxOrcamento;
+
+
+            startAnnealing(v, preco, valorEsperado, covariancia, flag);
+            /*
+            cout << "Orcamento: " << orcamento << endl;
+
+            cout << "Vetor encontrado: ";
+            for (int i = 0; i < qntAcoes; i++){
+                cout << v[i] << " ";
+            }
+            cout << endl << "Lambda: " << lambda(preco, valorEsperado, covariancia, v) << endl << "Custo: " << custo(preco, v) << endl << endl;
+            */
+            
+            arquivo.open(strCusto + ".txt", ios::app);
+            arquivo << custo(preco, v);
+            arquivo << "\n";
+            arquivo.close();
+
+            arquivo.open(strLambda + ".txt", ios::app);
+            arquivo << lambda(preco, valorEsperado, covariancia, v);
+            arquivo << "\n";
+            arquivo.close();
+
+            arquivo.open(strCarteira + ".txt", ios::app);
+            for (int i = 0; i<qntAcoes; i++)
+                arquivo << v[i] << " ";
+            arquivo << "\n";
+            arquivo.close();
+
+            arquivo.open(strOrcamentoFinalDia + ".txt", ios::app);
+            arquivo << orcamento;
+            arquivo << "\n";
+            arquivo.close();
+
+            delete preco;
+            delete valorEsperado;
+            delete flag;
+            for (int i = 0; i < qntAcoes; ++i)
+                delete[] covariancia[i];
+            delete[] covariancia;   
         }
-        cout << endl << "Lambda: " << lambda(preco, retorno, covariancia, v) << endl << "Custo: " << custo(preco, v) << endl << endl;
-
-        delete preco;   
-
-        Beep(750, 1000);
-        int escolha;
-        cout << "1 - Ir para o próximo dia" << endl << "2 - Encerrar" << endl;
-        cin >> escolha;
-        cin.ignore();
-
-        if (escolha == 2)   //implementar aqui para vender os ações de acordo com o valor do proximo dia e salvar num arquivo txt
-            flag = false;   
     }
-    delete retorno;
-    for (int i = 0; i < qntAcoes; ++i)
-        delete[] covariancia[i];
-    delete[] covariancia;
-}
-
 
 
 
